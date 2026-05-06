@@ -228,6 +228,9 @@ class Detect :
         """
 
         # --- initialisation of some sutility parameters ---
+        if self.scans is None:
+            return []
+
         l = self.lambda_angle
         d_phi = self.scans.angle_increment
         sigma = self.sigma
@@ -257,8 +260,13 @@ class Detect :
 
         cloudPoints_list = []
         for i in range(xyz_map.shape[1]):
+            if not np.isfinite(xyz_map[0, i]) or not np.isfinite(xyz_map[1, i]):
+                continue
             pt = (xyz_map[0,i], xyz_map[1,i])
             cloudPoints_list.append(pt)
+
+        if not cloudPoints_list:
+            return []
         
         # --------------------------------------------------
         # segment the cloud point into smaller point clouds
@@ -289,7 +297,10 @@ class Detect :
         for obs in objects_pointcloud_list:
             x_points.append(obs[int(len(obs)/2)][0])
             y_points.append(obs[int(len(obs)/2)][1])
-        s_points, d_points = self.converter.get_frenet(np.array(x_points), np.array(y_points))
+        try:
+            s_points, d_points = self.converter.get_frenet(np.array(x_points), np.array(y_points))
+        except ValueError:
+            return []
         
 
         remove_array=[]
