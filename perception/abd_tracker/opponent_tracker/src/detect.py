@@ -299,7 +299,8 @@ class Detect :
             y_points.append(obs[int(len(obs)/2)][1])
         try:
             s_points, d_points = self.converter.get_frenet(np.array(x_points), np.array(y_points))
-        except ValueError:
+        except ValueError as e:
+            rospy.logwarn(f"[Opponent Detection]: Frenet conversion failed in get_frenet: {e}")
             return []
         
 
