@@ -260,31 +260,43 @@ class Detect :
 
         cloudPoints_list = []
         for i in range(xyz_map.shape[1]):
-            if not np.isfinite(xyz_map[0, i]) or not np.isfinite(xyz_map[1, i]):
-                continue
             pt = (xyz_map[0,i], xyz_map[1,i])
             cloudPoints_list.append(pt)
 
-        if not cloudPoints_list:
-            return []
-        
         # --------------------------------------------------
         # segment the cloud point into smaller point clouds
         # that represent potential object using the adaptive
         # method
         # --------------------------------------------------
 
-        objects_pointcloud_list = [[[cloudPoints_list[0][0],cloudPoints_list[0][1]]]]
+        objects_pointcloud_list = []
+        prev_point = None
+        prev_idx = None
         for idx, point in enumerate(cloudPoints_list):
-            if (idx == 0):
+            if not np.isfinite(point[0]) or not np.isfinite(point[1]):
                 continue
+            point = [point[0], point[1]]
+            if prev_point is None:
+                objects_pointcloud_list.append([point])
+                prev_point = point
+                prev_idx = idx
+                continue
+
             dist = math.sqrt(point[0]**2 + point[1]**2)
-            d_max = (dist * math.sin(d_phi)/math.sin(l-d_phi)+3*sigma) / 2
-            if (math.dist([cloudPoints_list[idx-1][0],cloudPoints_list[idx-1][1]],
-            [point[0],point[1]])>d_max):
-                objects_pointcloud_list.append([[point[0],point[1]]])
+            angular_gap = (idx - prev_idx) * d_phi
+            if angular_gap >= l:
+                objects_pointcloud_list.append([point])
             else:
-                objects_pointcloud_list[-1].append([point[0],point[1]])
+                d_max = (dist * math.sin(angular_gap)/math.sin(l-angular_gap)+3*sigma) / 2
+                if math.dist(prev_point, point) > d_max:
+                    objects_pointcloud_list.append([point])
+                else:
+                    objects_pointcloud_list[-1].append(point)
+            prev_point = point
+            prev_idx = idx
+
+        if not objects_pointcloud_list:
+            return []
 
         # ------------------------------------------------
         # removing point clouds that are too small or too
@@ -529,6 +541,7 @@ class Detect :
         rate = rospy.Rate(self.rate)
         rospy.loginfo('[Opponent Detection]: Waiting for global wpnts')
         rospy.wait_for_message('/global_waypoints', WpntArray)
+        self.scans = rospy.wait_for_message('/scan', LaserScan)
         rospy.loginfo('[Opponent Detection]: Ready')
         while not rospy.is_shutdown():
             if self.measuring:
